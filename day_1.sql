@@ -51,10 +51,18 @@ teams as(
 	end win
 	from icc_world_cup
 )
-select team, count(team) played, sum(win) won,  count(team) - sum(win)  lost, sum(win) * 2 points
-from teams
-group by team
-order by points desc
+select
+	team,
+	count(team) played,
+	sum(win) won,
+	count(team) - sum(win) lost,
+	sum(win) * 2 points
+from
+	teams
+group by
+	team
+order by
+	points desc
 
 -- Team Standings -2
 with team_union as ( 
