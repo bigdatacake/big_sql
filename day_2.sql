@@ -17,6 +17,7 @@ order by
 	1; 
 
 -- Employees whose salary is more than their Managers
+-- Self Join with emp table
 select
 	e.emp_id,
 	e.emp_name,
