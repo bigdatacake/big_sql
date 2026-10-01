@@ -1,0 +1,75 @@
+A Postgres window function looks at neighboring rows to compute something, then writes that answer onto every row instead of collapsing the group into one line.
+
+Think of a classroom score sheet. A normal AVG(score) with GROUP BY class gives one average per class and throws away the individual students. A window function keeps every student and adds a column like “class average” or “rank in class” next to their name.
+
+You still get one output row for each input row. The function just peeks at a set of related rows—the window—while it calculates.
+
+The syntax always ends with OVER (...). That clause is what turns an ordinary function into a window function. Without OVER, SUM or AVG is a regular aggregate and returns one row. With OVER, it returns a value for every row.
+
+Window functions are only allowed in SELECT and ORDER BY clause.
+Window functions cannot be nested.
+Window functions run after WHERE clause.
+
+The three knobs
+PARTITION BY splits the table into groups, like separate classrooms. The function only sees rows in the same group as the current row. Omit it and the whole result is one window.
+
+ORDER BY (inside OVER) sorts rows inside that group. That is what makes “previous row,” “running total,” and “rank” possible. This order does not have to match the order of the final result.
+
+The frame is the slice of the partition that actually counts. By default, with ORDER BY, many aggregates use rows from the start of the partition through the current row—that is why SUM(...) OVER (ORDER BY date) becomes a running total. You can change that with ROWS BETWEEN ... or RANGE BETWEEN ... if you want, for example, only the last three rows.
+
+Common uses
+Ranking: ROW_NUMBER(), RANK(), DENSE_RANK() — “who is 1st, 2nd, 3rd in this group?”
+
+Running totals: SUM(amount) OVER (ORDER BY day)
+
+Compare to the group: salary versus department average, this month versus last month with LAG() / LEAD()
+
+Percent of total: amount / SUM(amount) OVER ()
+
+Example:
+SELECT
+  name,
+  dept,
+  salary,
+  AVG(salary) OVER (PARTITION BY dept) AS dept_avg,
+  salary - AVG(salary) OVER (PARTITION BY dept) AS vs_dept,
+  RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS dept_rank
+FROM employees;
+
+Each employee stays on their own row. dept_avg is the same for everyone in Engineering. dept_rank is 1 for the highest salary in that department, 2 for the next, and so on.
+
+Aggregate Functions: COUNT, SUM, AVG, MAX, MIN [Partition By optional]
+Rank Functions: ROW_NUMBER(), RANK() DENSE_RANK(), CUME_DIST(), PERCENT_RANK(), NTILE(n) [Partition By optional, Order by required]
+Value Functions: LEAD(expr, offset, default), LAG(expr, offset, default), FIRST_VALUE(expr), LAST_VALUE(expr) [Partition By optional, Order by required]
+
+FRAME CLAUSE
+The frame clause defines which subset of the current partition the window function actually computes over for each row. It sits inside OVER, after ORDER BY, and is what turns a partition into a sliding window such as a running total or a moving average.
+
+function_name(expr) OVER (
+  [PARTITION BY ...]
+  [ORDER BY ...]
+  [frame_clause]
+)
+
+Frame units
+Three modes describe how the bounds relate to the current row:
+
+Mode	Meaning
+ROWS	Physical offset in row count. ROWS 2 PRECEDING is exactly the two rows before the current row, plus the current row if the end is CURRENT ROW.
+RANGE	Logical offset on the ORDER BY value. RANGE 3 PRECEDING includes rows whose sort value is in [current − 3, current] (ascending), 
+	not a fixed row count. Peers with the same sort value are included together.
+GROUPS	Offset in distinct peer groups. GROUPS 1 PRECEDING includes the previous distinct ORDER BY value and every row that shares it, 
+	plus the current group.
+
+RANGE only works when the sort key has a meaningful difference (numeric or temporal). ROWS always works, including with ties, because it ignores values and counts positions.
+
+Frame extent
+You name a start, or both ends with BETWEEN:
+
+UNBOUNDED PRECEDING — first row of the partition
+n PRECEDING — n rows, value units, or groups before the current row
+CURRENT ROW — the current row (and, for RANGE/GROUPS, its peers)
+n FOLLOWING — n units after the current row
+UNBOUNDED FOLLOWING — last row of the partition
+
+The start must not come after the end. If you omit BETWEEN, the end defaults to CURRENT ROW, so ROWS 3 PRECEDING is the same as ROWS BETWEEN 3 PRECEDING AND CURRENT ROW.

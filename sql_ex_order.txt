@@ -1,0 +1,25 @@
+SQL is written starting with SELECT, but the engine logically processes a query from the source tables outward. The optimizer may change the physical plan; this is the logical order that explains aliases, filters, and grouping.
+
+SQL Execution Logical order
+1	FROM
+2	WHERE
+3	GROUP BY
+4	HAVING
+5	SELECT 
+6	DISTINCT
+7	ORDER BY
+8	TOP, LIMIT, OFFSET, FETCH
+
+Set operators (UNION, INTERSECT, EXCEPT) run after each side’s SELECT/DISTINCT and before the outer ORDER BY.
+
+Written vs processed
+Written position	Clause			Logical step	What exists afterward
+================	======			============	=====================
+2nd			FROM / JOIN / ON	1		Joined columns
+3rd			WHERE			2		Rows eligible for grouping
+4th			GROUP BY		3		One group per key
+5th			HAVING			4		Groups that pass the filter
+1st			SELECT			5		Projected rows and aliases
+with SELECT		DISTINCT		6		Unique output rows
+6th			ORDER BY		7		An ordered result
+last			LIMIT / OFFSET		8		The requested slice
